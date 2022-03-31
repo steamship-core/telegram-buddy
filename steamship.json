@@ -1,0 +1,9 @@
+{
+  "type": "app",
+  "name": "",
+  "handle": "",
+  "version": "0.0.1",
+  "description": "",
+  "author": "",
+  "entrypoint": "src.api.handler"
+}
