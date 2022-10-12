@@ -1,9 +1,17 @@
 {
   "type": "app",
-  "name": "",
   "handle": "",
-  "version": "0.0.1",
+  "version": "1.0.4",
   "description": "",
   "author": "",
-  "entrypoint": "src.api.handler"
+  "entrypoint": "api.handler",
+  "public": true,
+  "build_config": {
+    "ignore": [
+      "tests",
+      "notebooks"
+    ]
+  },
+  "configTemplate": {
+  }
 }

@@ -1,1 +1,1 @@
-git+ssh://git@github.com/nludb/python-client@main#egg=steamship
+steamship==2.1.28
