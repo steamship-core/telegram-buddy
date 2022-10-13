@@ -1,7 +1,7 @@
 {
   "type": "app",
-  "handle": "",
-  "version": "1.0.4",
+  "handle": "my-package",
+  "version": "1.0.7",
   "description": "",
   "author": "",
   "entrypoint": "api.handler",
@@ -9,9 +9,18 @@
   "build_config": {
     "ignore": [
       "tests",
-      "notebooks"
+      "examples"
     ]
   },
   "configTemplate": {
+    "defaultname": {
+      "type": "string",
+      "description": "The default name to greet."
+    },
+    "enthusiastic": {
+      "type": "boolean",
+      "description": "Whether to greet enthusiastically.",
+      "default": false
+    }
   }
 }

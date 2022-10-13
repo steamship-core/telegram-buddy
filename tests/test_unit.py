@@ -1,19 +1,18 @@
+"""Unit tests for the package."""
+
 from steamship import Steamship
-from src.api import MyApp
+
+from src.api import MyPackage
+
 
 def test_greeting():
-    """We can test the app like a regular python object!"""
+    """Test the app like a regular Python object."""
     client = Steamship()
-    app = MyApp(client=client, config=MyApp.MyAppConfig(
-        default_name="World"
-    ))
+    app = MyPackage(client=client, config={"default_name": "World"})
 
-    assert(app.greet().data == "Hello, World.")
-    assert(app.greet(name="Ted").data == "Hello, Ted.")
+    assert app.greet().data == "Hello, World."
+    assert app.greet(name="Ted").data == "Hello, Ted."
 
-    app2 = MyApp(client=client, config=MyApp.MyAppConfig(
-        default_name="World",
-        enthusiastic=True
-    ))
-    assert(app2.greet().data == "Hello, World!")
-    assert(app2.greet(name="Ted").data == "Hello, Ted!")
+    app2 = MyPackage(client=client, config={"default_name": "World", "enthusiastic": True})
+    assert app2.greet().data == "Hello, World!"
+    assert app2.greet(name="Ted").data == "Hello, Ted!"
