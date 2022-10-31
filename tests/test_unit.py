@@ -6,13 +6,14 @@ from src.api import MyPackage
 
 
 def test_greeting():
-    """Test the app like a regular Python object."""
+    """You can test your app like a regular Python object."""
+    print("Running")
     client = Steamship()
     app = MyPackage(client=client, config={"default_name": "World"})
 
-    assert app.greet().data == "Hello, World."
-    assert app.greet(name="Ted").data == "Hello, Ted."
+    assert app.greet() == "Hello, World."
+    assert app.greet(name="Ted") == "Hello, Ted."
 
     app2 = MyPackage(client=client, config={"default_name": "World", "enthusiastic": True})
-    assert app2.greet().data == "Hello, World!"
-    assert app2.greet(name="Ted").data == "Hello, Ted!"
+    assert app2.greet() == "Hello, World!"
+    assert app2.greet(name="Ted") == "Hello, Ted!"
