@@ -1,7 +1,7 @@
 {
-  "type": "app",
-  "handle": "my-package",
-  "version": "1.0.7",
+  "type": "package",
+  "handle": "ted-empty-package",
+  "version": "1.0.0",
   "description": "",
   "author": "",
   "entrypoint": "api.handler",
@@ -13,7 +13,7 @@
     ]
   },
   "configTemplate": {
-    "defaultname": {
+    "default_name": {
       "type": "string",
       "description": "The default name to greet."
     },
