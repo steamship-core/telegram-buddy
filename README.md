@@ -33,29 +33,35 @@ Wait about 30 seconds after deployment finishes for the package to become availa
 Then, create an instance.
 
 ```bash
-ship package:instance:create --defaultname="Beautiful"
+ship package:instance:create --default_name="Beautiful"
 ```
 
 That keyword argument above is part of the required configuration.
 You can see where it's defined in both the [steamship.json](steamship.json) file and in the [src/api.py](src/api.py) file.
 
+The response will let you know what your **Instance Handle** is.
+
 Finally, invoke a method!
+
+```bash
+ship package:instance:invoke --instance="INSTANCE_HANDLE" --method="greet"    
+```
 
 ### Invoke your Package from Python
 
-Let's try invoking your package from Python.
+It's more likely you'll want to call your package from software you're writing. Let's try from Python.
 
-Just type:
+Create a new instance and invoke it with:
 
 ```python
 from steamship import Steamship
 
-# TODO: Replace with your package handle below
-instance = Steamship.use("yourname-demo", "instance-name", config={
-    "defaultname": "Beautiful"
+# TODO: Replace with your package and instance handle below
+instance = Steamship.use("PACKAGE_HANDLE", "INSTANCE_HANDLE", config={
+    "default_name": "Beautiful"
 })
-                         
-print(instance.invoke("greeting"))
+
+print(instance.invoke("greet"))
 ```
 
 ## Extending on your own
