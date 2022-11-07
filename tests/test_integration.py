@@ -28,7 +28,7 @@ def random_name() -> str:
 
 def test_greeting():
     """When your package runs in the cloud, you invoke it with Steamship.use."""
-    # Create an instance of this package witha random name.
+    # Create an instance of this package with a random name.
     instance = Steamship.use(package_name(), random_name(), config={"default_name": "Beautiful"})
 
     assert instance.invoke("greet") == "Hello, Beautiful."
