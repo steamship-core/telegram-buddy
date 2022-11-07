@@ -1,7 +1,7 @@
 """Description of your app."""
 from typing import Type
 
-from steamship.invocable import Config, Invocable, create_handler, post
+from steamship.invocable import Config, create_handler, post, PackageService
 
 
 class MyPackageConfig(Config):
@@ -12,7 +12,7 @@ class MyPackageConfig(Config):
     enthusiastic: bool = False  # Not required
 
 
-class MyPackage(Invocable):
+class MyPackage(PackageService):
     """Example steamship Package."""
 
     config: MyPackageConfig
