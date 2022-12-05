@@ -32,4 +32,4 @@ class MyPackage(PackageService):
         return f"Hello, {name}{punct}"
 
 
-handler = create_handler(MyPackage)
+
