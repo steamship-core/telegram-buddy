@@ -20,7 +20,8 @@ class MyPackage(PackageService):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def config_cls(self) -> Type[Config]:
+    @classmethod
+    def config_cls(cls) -> Type[Config]:
         """Return the Configuration class."""
         return MyPackageConfig
 
