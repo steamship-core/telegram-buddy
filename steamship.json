@@ -1,0 +1,51 @@
+{
+	"type": "package",
+	"handle": "telegram-buddy",
+	"version": "0.0.1-rc.14",
+	"description": "",
+	"author": "dave",
+	"entrypoint": "Unused",
+	"public": true,
+	"plugin": null,
+	"build_config": {
+		"ignore": [
+			"tests",
+			"examples"
+		]
+	},
+	"configTemplate": {
+		"bot_name": {
+			"type": "string",
+			"description": null,
+			"default": null
+		},
+		"bot_personality": {
+			"type": "string",
+			"description": null,
+			"default": null
+		},
+		"bot_token": {
+			"type": "string",
+			"description": null,
+			"default": null
+		}
+	},
+	"steamshipRegistry": {
+		"tagline": "",
+		"tagline2": null,
+		"usefulFor": null,
+		"videoUrl": null,
+		"githubUrl": null,
+		"demoUrl": null,
+		"blogUrl": null,
+		"jupyterUrl": null,
+		"authorGithub": "",
+		"authorName": "dave",
+		"authorEmail": null,
+		"authorTwitter": null,
+		"authorUrl": null,
+		"tags": [
+			"Prompt API"
+		]
+	}
+}
