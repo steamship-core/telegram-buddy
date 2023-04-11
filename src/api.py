@@ -60,6 +60,8 @@ class TelegramBuddy(PackageService):
     def prepare_response(self, message_text: str, chat_id: int) -> str:
         """ Use the LLM to prepare the next response by appending the user input to the file and then generating. """
         chat_file = self.get_file_for_chat(chat_id)
+
+        # TODO: limit total tokens passed
         chat_file.append_block(text=message_text, tags=[Tag(kind=TagKind.ROLE, name=RoleTag.USER)])
         generate_task = self.gpt4.generate(input_file_id=chat_file.id, append_output_to_file=True, output_file_id=chat_file.id)
 
