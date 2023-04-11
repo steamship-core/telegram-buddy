@@ -8,3 +8,4 @@ src/.steamship/secrets.toml
 .steamship/secrets.toml
 /token.txt
 venv
+*.DS_Store
