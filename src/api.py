@@ -1,6 +1,6 @@
 """Description of your app."""
 import json
-from typing import Type, Optional
+from typing import Type, Optional, Dict, Any
 
 import requests
 from steamship.invocable import Config, post, PackageService, InvocableResponse
@@ -8,6 +8,7 @@ from steamship import SteamshipError, File, Block, Tag
 from steamship.data.tags.tag_constants import TagKind, RoleTag
 import logging
 from pydantic import Field
+import uuid
 
 class TelegramBuddyConfig(Config):
     """Config object containing required parameters to initialize a MyPackage instance."""
@@ -43,15 +44,37 @@ class TelegramBuddy(PackageService):
         logging.info(f"Initialized webhook with URL {webhook_url}")
 
 
+    @post("answer", public=True)
+    def answer(self, question: str, chat_session_id: Optional[str] = None) -> Dict[str, Any]:
+        """Endpoint that implements the contract for Steamship embeddable chat widgets. This is a PUBLIC endpoint since these webhooks do not pass a token."""
+        logging.info(f"/answer: {question} {chat_session_id}")
+
+        if not chat_session_id:
+            chat_session_id = "default"
+        
+        message_id = str(uuid.uuid4())
+
+        try:
+            response = self.prepare_response(question, chat_session_id, message_id)
+        except SteamshipError as e:
+            response = f"Sorry, I encountered an error while trying to think of a response: {e.message}"
+
+        return {
+            "answer": response,
+            "sources": [],
+            "is_plausible": True,
+        }
+    
+
     @post("respond", public=True)
     def respond(self, update_id: int, message: dict) -> InvocableResponse[str]:
-        """ This is the responder method for the telegram webhook. It is public since Telegram cannot pass a Bearer token. """
+        """Endpoint implementing the Telegram WebHook contract. This is a PUBLIC endpoint since Telegram cannot pass a Bearer token."""
 
         # TODO: must reject things not from the package
         message_text = message['text']
         chat_id = message['chat']['id']
         message_id = message['message_id']
-        logging.info(f"{message_text} {chat_id} {type(chat_id)}")
+        logging.info(f"/respond: {message_text} {chat_id} {type(chat_id)}")
         try:
             response = self.prepare_response(message_text, chat_id, message_id)
         except SteamshipError as e:
@@ -61,6 +84,15 @@ class TelegramBuddy(PackageService):
 
         return InvocableResponse(string="OK")
 
+    @post("info")
+    def info(self) -> dict:
+        """Endpoint returning information about this bot."""
+        resp = requests.get(self.api_root+'/getMe')
+        j = resp.json()
+        logging.info(f"/respond: {j}")
+        return {
+            "telegram": j.get("result")
+        }
 
     def prepare_response(self, message_text: str, chat_id: int, message_id: int) -> Optional[str]:
         """ Use the LLM to prepare the next response by appending the user input to the file and then generating. """
