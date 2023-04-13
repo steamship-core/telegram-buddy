@@ -87,12 +87,9 @@ class TelegramBuddy(PackageService):
     @post("info")
     def info(self) -> dict:
         """Endpoint returning information about this bot."""
-        resp = requests.get(self.api_root+'/getMe')
-        j = resp.json()
-        logging.info(f"/respond: {j}")
-        return {
-            "telegram": j.get("result")
-        }
+        resp = requests.get(self.api_root+'/getMe').json()
+        logging.info(f"/info: {resp}")
+        return {"telegram": resp.get("result")}
 
     def prepare_response(self, message_text: str, chat_id: int, message_id: int) -> Optional[str]:
         """ Use the LLM to prepare the next response by appending the user input to the file and then generating. """
