@@ -2,6 +2,8 @@ import tiktoken
 from steamship.data.tags.tag_constants import RoleTag, TagKind
 from steamship import Block, SteamshipError
 from typing import List
+import logging
+
 
 def block_role(block: Block) -> RoleTag:
 	for tag in block.tags:
@@ -44,10 +46,13 @@ def filter_blocks_for_prompt_length(max_tokens: int, blocks: List[Block]) -> Lis
 			if block_length + total_length < max_tokens:
 				retained_blocks.append(block)
 				total_length += block_length
+				logging.info(f"Adding block {block.index_in_file} of token length {block_length}")
 
 	# If we didn't add any non-system blocks, throw error
 	if len(retained_blocks) == num_system_blocks:
 		raise SteamshipError(
 			f"Plugin attempted to filter input to fit into {max_tokens} tokens, but no non-System blocks remained.")
 
-	return [block.index_in_file for block in blocks if block in retained_blocks]
+	block_indices = [block.index_in_file for block in blocks if block in retained_blocks]
+	logging.info(f"Filtered input.  Total tokens {total_length} Block indices: {block_indices}")
+	return block_indices
