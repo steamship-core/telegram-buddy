@@ -3,12 +3,15 @@ import json
 from typing import Type, Optional, Dict, Any
 
 import requests
-from steamship.invocable import Config, post, PackageService, InvocableResponse
+from steamship.invocable import Config, post, get, PackageService, InvocableResponse
 from steamship import SteamshipError, File, Block, Tag
 from steamship.data.tags.tag_constants import TagKind, RoleTag
 import logging
 from pydantic import Field
 import uuid
+
+from util import filter_blocks_for_prompt_length
+
 
 class TelegramBuddyConfig(Config):
     """Config object containing required parameters to initialize a MyPackage instance."""
@@ -98,11 +101,16 @@ class TelegramBuddy(PackageService):
         if self.includes_message(chat_file, message_id):
             return None
 
-        # TODO: limit total tokens passed
+
         chat_file.append_block(text=message_text, tags=[
             Tag(kind=TagKind.ROLE, name=RoleTag.USER),
             Tag(kind="message_id", name=str(message_id))
         ])
+        chat_file.refresh()
+        # Limit total tokens passed to fit in context window
+        max_tokens = self.max_tokens_for_model()
+        retained_blocks = filter_blocks_for_prompt_length(max_tokens, chat_file.blocks)
+        # input_file_block_index_list = retained_blocks,
         generate_task = self.gpt4.generate(input_file_id=chat_file.id, append_output_to_file=True, output_file_id=chat_file.id)
 
         # TODO: handle moderated input error
@@ -143,6 +151,10 @@ class TelegramBuddy(PackageService):
             self.api_root+'/sendMessage',
             params=reply_params)
 
-
+    def max_tokens_for_model(self) -> int:
+        if self.config.use_gpt4:
+            return 8000
+        else:
+            return 4097
 
 
