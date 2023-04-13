@@ -1,6 +1,6 @@
 {
 	"type": "package",
-	"handle": "ted-telegram-buddy",
+	"handle": "telegram-buddy",
 	"version": "0.0.8",
 	"description": "A package that allows quick creation of a Telegram bot hosted on Steamship.",
 	"author": "dave",
