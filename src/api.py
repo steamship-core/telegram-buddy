@@ -110,8 +110,8 @@ class TelegramBuddy(PackageService):
         # Limit total tokens passed to fit in context window
         max_tokens = self.max_tokens_for_model()
         retained_blocks = filter_blocks_for_prompt_length(max_tokens, chat_file.blocks)
-        # input_file_block_index_list = retained_blocks,
-        generate_task = self.gpt4.generate(input_file_id=chat_file.id, append_output_to_file=True, output_file_id=chat_file.id)
+        generate_task = self.gpt4.generate(input_file_id=chat_file.id, input_file_block_index_list = retained_blocks,
+                                           append_output_to_file=True, output_file_id=chat_file.id)
 
         # TODO: handle moderated input error
         generate_task.wait()
@@ -153,8 +153,10 @@ class TelegramBuddy(PackageService):
 
     def max_tokens_for_model(self) -> int:
         if self.config.use_gpt4:
-            return 8000
+            # Use 7800 instead of 8000 as buffer for different counting
+            return 7800 - self.gpt4.config['max_tokens']
         else:
-            return 4097
+            # Use 4000 instead of 4097 as buffer for different counting
+            return 4097 - self.gpt4.config['max_tokens']
 
 
