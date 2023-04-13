@@ -77,7 +77,6 @@ class TelegramBuddy(PackageService):
         message_text = message['text']
         chat_id = message['chat']['id']
         message_id = message['message_id']
-        logging.info(f"/respond: {message_text} {chat_id} {type(chat_id)}")
         try:
             response = self.prepare_response(message_text, chat_id, message_id)
         except SteamshipError as e:
