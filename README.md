@@ -41,3 +41,5 @@ Want to extend the functionality?  Clone this repo and make it your own!
 Just change the package handle in steamship.json and you can deploy a different version.
 
 More info here: https://docs.steamship.com/packages/developing/index.html
+
+Join our discord here: https://steamship.com/discord
