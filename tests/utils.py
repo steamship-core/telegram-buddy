@@ -3,11 +3,11 @@ from typing import Optional
 import logging
 from steamship import Steamship, Task
 from steamship.invocable import InvocationContext, Invocable, InvocableRequest, Invocation, LoggingConfig
-from steamship.invocable.lambda_handler import create_safe_handler
 from steamship.utils.url import Verb
 from pyngrok import ngrok
 from http import server
 from socketserver import TCPServer
+from http_handler import create_safe_handler
 
 def use_local(client: Steamship, package_class, context: Optional[InvocationContext] = None, config: Optional[dict] = None):
     def add_method(package_class, method, method_name=None):
@@ -66,8 +66,6 @@ def use_local(client: Steamship, package_class, context: Optional[InvocationCont
     return obj
 
 def make_handler(invocable: Invocable, client: Steamship, context: InvocationContext):
-    handler = create_safe_handler(invocable)
-
     class LocalHttpHandler(server.SimpleHTTPRequestHandler):
         def _set_response(self):
             self.send_response(200)
@@ -91,15 +89,17 @@ def make_handler(invocable: Invocable, client: Steamship, context: InvocationCon
                     invocation_path = self.path,
                     arguments = post_json
                 )
-                request = InvocableRequest(
+                event = InvocableRequest(
                     client_config = client.config,
                     invocation = invocation,
                     logging_config = LoggingConfig(logging_host=None, logging_port=None),
                     invocation_context = context
                 )
 
-                resp = handler(request.dict())
-                print(resp)
+                handler = create_safe_handler(invocable)
+                resp = handler(event.dict(), context)
+
+                rr = InvocableRequest.parse_obj(event.dict())
 
                 logging.info("POST request,\nPath: %s\nHeaders:\n%s\n\nBody:\n%s\n",
                         str(self.path), str(self.headers), post_data.decode('utf-8'))
@@ -136,4 +136,5 @@ def use_local_with_ngrok(client: Steamship, package_class, config: Optional[dict
 
     print(f"Now serving..")
     httpd.serve_forever()
+
 
