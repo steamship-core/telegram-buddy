@@ -1,18 +1,13 @@
-"""Unit tests for the package."""
-
 from steamship import Steamship
 
 from src.api import TelegramBuddy
 from utils import use_local_with_ngrok
 
-
-def test_greeting():
-    """You can test your app like a regular Python object."""
+if __name__ == "__main__":
     client = Steamship()
     use_local_with_ngrok(client, TelegramBuddy, config={
-        "botName": "ted",
+        "botName": "buddy",
         "botPersonality": "happy",
-        "botToken": "5720939969:AAEQTYUatOLJz2t6mpR7kkYqlE2850DSFMg"
-    })
-
-
+        "botToken": "your-telegram-bot-token-here"
+    },
+    port=8083)
