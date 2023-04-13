@@ -9,63 +9,7 @@ from http import server
 from socketserver import TCPServer
 from http_handler import create_safe_handler
 
-def use_local(client: Steamship, package_class, context: Optional[InvocationContext] = None, config: Optional[dict] = None):
-    def add_method(package_class, method, method_name=None):
-        setattr(package_class, method_name or method.__name__, method)
-
-    def handle_kwargs(kwargs: Optional[dict] = None):
-        if kwargs is not None and "wait_on_tasks" in kwargs:
-            if kwargs["wait_on_tasks"] is not None:
-                for task in kwargs["wait_on_tasks"]:
-                    # It might not be of type Task if the invocation was something we've monkeypatched.
-                    if type(task) == Task:
-                        task.wait()
-            kwargs.pop("wait_on_tasks")
-        return kwargs
-
-    def invoke(self, path: str, verb: Verb = Verb.POST, **kwargs):
-        # Note: the correct impl would inspect the fn lookup for the fn with the right verb.
-        path = path.rstrip("/").lstrip("/")
-        fn = getattr(self, path)
-        new_kwargs = handle_kwargs(kwargs)
-        print(f"Patched invocation of self.invoke('{path}', {kwargs})")
-        res = fn(**new_kwargs)
-        if hasattr(res, 'dict'):
-            return getattr(res, 'dict')()
-        # TODO: Handle if they returned a InvocationResponse object
-        return res
-
-    def invoke_later(self, path: str, verb: Verb = Verb.POST, **kwargs):
-        # Note: the correct impl would inspect the fn lookup for the fn with the right verb.
-        path = path.rstrip("/").lstrip("/")
-        fn = getattr(self, path)
-        new_kwargs = handle_kwargs(kwargs)
-        invoke_later_args = new_kwargs.get("arguments", {}) # Specific to invoke_later
-        print(f"Patched invocation of self.invoke_later('{path}', {kwargs})")
-        return fn(**invoke_later_args)
-
-    add_method(package_class, invoke)
-    add_method(package_class, invoke_later)
-
-    if not context:
-        context = InvocationContext()
-
-    if not context.workspace_id:
-        context.workspace_id = client.config.workspace_id
-    if not context.invocable_handle:
-        context.invocable_handle = f"{package_class}"
-    if not context.invocable_type:
-        context.invocable_type = "package"
-
-    obj = package_class(
-        client=client,
-        context=context,
-        config=config
-    )
-
-    return obj
-
-def make_handler(invocable: Invocable, client: Steamship, context: InvocationContext):
+def make_handler(invocable: Invocable, client: Steamship, context: InvocationContext, config: dict = {}):
     class LocalHttpHandler(server.SimpleHTTPRequestHandler):
         def _set_response(self):
             self.send_response(200)
@@ -87,7 +31,8 @@ def make_handler(invocable: Invocable, client: Steamship, context: InvocationCon
                 invocation = Invocation(
                     http_verb = "POST",
                     invocation_path = self.path,
-                    arguments = post_json
+                    arguments = post_json,
+                    config = config
                 )
                 event = InvocableRequest(
                     client_config = client.config,
@@ -97,7 +42,7 @@ def make_handler(invocable: Invocable, client: Steamship, context: InvocationCon
                 )
 
                 handler = create_safe_handler(invocable)
-                resp = handler(event.dict(), context)
+                resp = handler(event.dict(by_alias=True), context)
 
                 rr = InvocableRequest.parse_obj(event.dict())
 
@@ -123,16 +68,29 @@ def use_local_with_ngrok(client: Steamship, package_class, config: Optional[dict
     print(f"URL: {public_url}")
     print(f"Client Auth: Hardcoded")
 
+    # We need to trigger the instance init.
     context = InvocationContext(
         invocable_url=f"{public_url}/"
     )
 
-    instance = use_local(client, package_class, context=context, config=config)
+    # Now start the server
+    httpd = TCPServer(("", port), make_handler(package_class, client, context, config))
 
-    httpd = TCPServer(("", port), make_handler(instance, client, context))
+    invocation = Invocation(
+        http_verb="POST",
+        invocation_path="__dir__",
+        arguments={},
+        config=config
+    )
+    event = InvocableRequest(
+        client_config=client.config,
+        invocation=invocation,
+        logging_config=LoggingConfig(logging_host=None, logging_port=None),
+        invocation_context=context
+    )
+    handler = create_safe_handler(package_class)
+    resp = handler(event.dict(by_alias=True), context)
 
-    print(f"Running __instance_init__:")
-    instance.instance_init()
 
     print(f"Now serving..")
     httpd.serve_forever()

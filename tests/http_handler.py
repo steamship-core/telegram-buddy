@@ -19,11 +19,159 @@ from steamship.base import SteamshipError
 from steamship.client import Steamship
 from steamship.data.workspace import SignedUrl
 from steamship.invocable import Invocable, InvocableRequest, InvocableResponse, InvocationContext
-from steamship.invocable.lambda_handler import safely_find_invocable_class, encode_exception, internal_handler
+from steamship.invocable.lambda_handler import safely_find_invocable_class, encode_exception
 from steamship.utils.signed_urls import upload_to_signed_url
+import json
+from typing import Optional
+import logging
+from steamship import Steamship, Task
+from steamship.invocable import InvocationContext, Invocable, InvocableRequest
+from steamship.utils.url import Verb
 
 
-def handler(internal_handler, event: Dict, _: Dict = None) -> dict:  # noqa: C901
+def use_local(client: Steamship, package_class, context: Optional[InvocationContext] = None, config: Optional[dict] = None):
+    def add_method(package_class, method, method_name=None):
+        setattr(package_class, method_name or method.__name__, method)
+
+    def handle_kwargs(kwargs: Optional[dict] = None):
+        if kwargs is not None and "wait_on_tasks" in kwargs:
+            if kwargs["wait_on_tasks"] is not None:
+                for task in kwargs["wait_on_tasks"]:
+                    # It might not be of type Task if the invocation was something we've monkeypatched.
+                    if type(task) == Task:
+                        task.wait()
+            kwargs.pop("wait_on_tasks")
+        return kwargs
+
+    def invoke(self, path: str, verb: Verb = Verb.POST, **kwargs):
+        # Note: the correct impl would inspect the fn lookup for the fn with the right verb.
+        path = path.rstrip("/").lstrip("/")
+        fn = getattr(self, path)
+        new_kwargs = handle_kwargs(kwargs)
+        print(f"Patched invocation of self.invoke('{path}', {kwargs})")
+        res = fn(**new_kwargs)
+        if hasattr(res, 'dict'):
+            return getattr(res, 'dict')()
+        # TODO: Handle if they returned a InvocationResponse object
+        return res
+
+    def invoke_later(self, path: str, verb: Verb = Verb.POST, **kwargs):
+        # Note: the correct impl would inspect the fn lookup for the fn with the right verb.
+        path = path.rstrip("/").lstrip("/")
+        fn = getattr(self, path)
+        new_kwargs = handle_kwargs(kwargs)
+        invoke_later_args = new_kwargs.get("arguments", {}) # Specific to invoke_later
+        print(f"Patched invocation of self.invoke_later('{path}', {kwargs})")
+        return fn(**invoke_later_args)
+
+    add_method(package_class, invoke)
+    add_method(package_class, invoke_later)
+
+    if not context:
+        context = InvocationContext()
+
+    if not context.workspace_id:
+        context.workspace_id = client.config.workspace_id
+    if not context.invocable_handle:
+        context.invocable_handle = f"{package_class}"
+    if not context.invocable_type:
+        context.invocable_type = "package"
+
+    obj = package_class(
+        client=client,
+        context=context,
+        config=config
+    )
+
+    return obj
+
+def internal_handler(  # noqa: C901
+    invocable_cls_func: Callable[[], Type[Invocable]],
+    event: Dict,
+    client: Steamship,
+    invocation_context: InvocationContext,
+) -> InvocableResponse:
+
+    try:
+        request = InvocableRequest.parse_obj(event)
+    except SteamshipError as se:
+        logging.exception(se)
+        return InvocableResponse.from_obj(se)
+    except Exception as ex:
+        logging.exception(ex)
+        return InvocableResponse.error(
+            code=HTTPStatus.INTERNAL_SERVER_ERROR,
+            message="Plugin/App handler was unable to parse inbound request.",
+            exception=ex,
+        )
+
+    if request and request.invocation:
+        error_prefix = (
+            f"[ERROR - {request.invocation.http_verb} {request.invocation.invocation_path}] "
+        )
+    else:
+        error_prefix = "[ERROR - ?VERB ?PATH] "
+
+    if request.invocation.invocation_path == "/__dir__":
+        # Return the DIR result without (1) Constructing invocable_cls or (2) Parsing its config (in the constructor)
+        try:
+            cls = invocable_cls_func()
+            return InvocableResponse(json=cls.__steamship_dir__(cls))
+        except SteamshipError as se:
+            logging.exception(se)
+            return InvocableResponse.from_obj(se)
+        except Exception as ex:
+            logging.exception(ex)
+            return InvocableResponse.error(
+                code=HTTPStatus.INTERNAL_SERVER_ERROR,
+                prefix=error_prefix,
+                message="Unable to initialize package/plugin.",
+                exception=ex,
+            )
+
+    try:
+        print(f"Running __instance_init__:")
+        invocable = use_local(client, invocable_cls_func(), context=invocation_context, config=request.invocation.config)
+        invocable.instance_init()
+        # invocable = invocable_cls_func()(
+        #     client=client, config=request.invocation.config, context=invocation_context
+        # )
+    except SteamshipError as se:
+        logging.exception(se)
+        return InvocableResponse.from_obj(se)
+    except Exception as ex:
+        logging.exception(ex)
+        return InvocableResponse.error(
+            code=HTTPStatus.INTERNAL_SERVER_ERROR,
+            prefix=error_prefix,
+            message="Unable to initialize package/plugin.",
+            exception=ex,
+        )
+
+    if not invocable:
+        return InvocableResponse.error(
+            code=HTTPStatus.INTERNAL_SERVER_ERROR,
+            prefix=error_prefix,
+            message="Unable to construct package/plugin for invocation.",
+        )
+
+    try:
+        response = invocable(request)
+        return InvocableResponse.from_obj(response)
+    except SteamshipError as se:
+        logging.exception(se)
+        se.message = f"{error_prefix}{se.message}"
+        return InvocableResponse.from_obj(se)
+    except Exception as ex:
+        logging.exception(ex)
+        return InvocableResponse.error(
+            code=HTTPStatus.INTERNAL_SERVER_ERROR,
+            prefix=error_prefix,
+            exception=ex,
+        )
+
+
+def handler(bound_internal_handler, event: Dict, _: Dict = None) -> dict:  # noqa: C901
     logging_config = event.get("loggingConfig")
     logging_host = None
     logging_handler = None
@@ -111,7 +259,7 @@ def handler(internal_handler, event: Dict, _: Dict = None) -> dict:  # noqa: C90
             exception=ex,
         ).dict(by_alias=True)
     logging.info(f"Localstack hostname: {environ.get('LOCALSTACK_HOSTNAME')}.")
-    response = internal_handler(event, client, invocation_context)
+    response = bound_internal_handler(event, client, invocation_context)
 
     result = response.dict(by_alias=True, exclude={"client"})
     # When created with data > 4MB, data is uploaded to a bucket.
@@ -148,7 +296,6 @@ def handler(internal_handler, event: Dict, _: Dict = None) -> dict:  # noqa: C90
         logging_handler.close()
 
     return result
-
 
 
 def create_safe_handler(known_invocable_for_testing: Type[Invocable] = None):
