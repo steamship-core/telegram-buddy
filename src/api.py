@@ -153,8 +153,10 @@ class TelegramBuddy(PackageService):
 
     def max_tokens_for_model(self) -> int:
         if self.config.use_gpt4:
-            return 8000
+            # Use 7800 instead of 8000 as buffer for different counting
+            return 7800 - self.gpt4.config['max_tokens']
         else:
-            return 4097
+            # Use 4000 instead of 4097 as buffer for different counting
+            return 4097 - self.gpt4.config['max_tokens']
 
 
