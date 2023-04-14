@@ -1,6 +1,6 @@
 {
 	"type": "package",
-	"handle": "telegram-buddy",
+	"handle": "random-challenge-buddy",
 	"version": "1.0.1",
 	"description": "A package that allows quick creation of a Telegram bot hosted on Steamship.",
 	"author": "dave",
