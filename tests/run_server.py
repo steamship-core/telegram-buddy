@@ -8,6 +8,6 @@ if __name__ == "__main__":
     use_local_with_ngrok(client, TelegramBuddy, config={
         "botName": "buddy",
         "botPersonality": "happy",
-        "botToken": "6122588092:AAEioCXNaLm6zH7dfi-pvGoxcU6BrgmQrX8"
+        "botToken": "YOUR-KEY"
     },
     port=8083)
