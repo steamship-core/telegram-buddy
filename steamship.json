@@ -1,7 +1,7 @@
 {
 	"type": "package",
 	"handle": "telegram-buddy",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "A package that allows quick creation of a Telegram bot hosted on Steamship.",
 	"author": "dave",
 	"entrypoint": "Unused",

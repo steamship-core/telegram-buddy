@@ -1,10 +1,10 @@
 """Description of your app."""
 import json
-from typing import Type, Optional, Dict, Any
+from typing import Type, Optional, Dict, Any, cast
 
 import requests
 from steamship.invocable import Config, post, get, PackageService, InvocableResponse
-from steamship import SteamshipError, File, Block, Tag
+from steamship import SteamshipError, File, Block, Tag, PluginInstance
 from steamship.data.tags.tag_constants import TagKind, RoleTag
 import logging
 from pydantic import Field
@@ -25,13 +25,20 @@ class TelegramBuddy(PackageService):
     """Telegram Buddy package.  Stores individual chats in Steamship Files for chat history."""
 
     config: TelegramBuddyConfig
+    gpt4: Optional[PluginInstance]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.api_root = f'https://api.telegram.org/bot{self.config.bot_token}'
-        model = "gpt-4" if self.config.use_gpt4 else "gpt-3.5-turbo"
-        self.gpt4 = self.client.use_plugin("gpt-4", config={"model": model, "temperature": 0.8})
+        self.model = "gpt-4" if self.config.use_gpt4 else "gpt-3.5-turbo"
+        self.gpt4 = None
 
+    def get_gpt4(self) -> PluginInstance:
+        if self.gpt4 is not None:
+            return self.gpt4
+        else:
+            self.gpt4 = self.client.use_plugin("gpt-4", config={"model": self.model, "temperature": 0.8})
+            return self.gpt4
 
     @classmethod
     def config_cls(cls) -> Type[Config]:
@@ -60,7 +67,7 @@ class TelegramBuddy(PackageService):
         try:
             response = self.prepare_response(question, chat_session_id, message_id)
         except SteamshipError as e:
-            response = f"Sorry, I encountered an error while trying to think of a response: {e.message}"
+            response = self.response_for_exception(e)
 
         return {
             "answer": response,
@@ -72,19 +79,24 @@ class TelegramBuddy(PackageService):
     @post("respond", public=True)
     def respond(self, update_id: int, message: dict) -> InvocableResponse[str]:
         """Endpoint implementing the Telegram WebHook contract. This is a PUBLIC endpoint since Telegram cannot pass a Bearer token."""
-
-        # TODO: must reject things not from the package
         message_text = message['text']
         chat_id = message['chat']['id']
         message_id = message['message_id']
-        try:
-            response = self.prepare_response(message_text, chat_id, message_id)
-        except SteamshipError as e:
-            response = f"Sorry, I encountered an error while trying to think of a response: {e.message}"
-        if response is not None:
-            self.send_response(chat_id, response)
 
-        return InvocableResponse(string="OK")
+        # TODO: must reject things not from the package
+        try:
+            try:
+                response = self.prepare_response(message_text, chat_id, message_id)
+            except SteamshipError as e:
+                response = self.response_for_exception(e)
+            if response is not None:
+                self.send_response(chat_id, response)
+
+            return InvocableResponse(string="OK")
+        except Exception as e:
+            response = self.response_for_exception(e)
+            self.send_response(chat_id, response)
+            return InvocableResponse(string="OK")
 
     @post("info")
     def info(self) -> dict:
@@ -109,7 +121,7 @@ class TelegramBuddy(PackageService):
         # Limit total tokens passed to fit in context window
         max_tokens = self.max_tokens_for_model()
         retained_blocks = filter_blocks_for_prompt_length(max_tokens, chat_file.blocks)
-        generate_task = self.gpt4.generate(input_file_id=chat_file.id, input_file_block_index_list = retained_blocks,
+        generate_task = self.get_gpt4().generate(input_file_id=chat_file.id, input_file_block_index_list = retained_blocks,
                                            append_output_to_file=True, output_file_id=chat_file.id)
 
         # TODO: handle moderated input error
@@ -153,9 +165,17 @@ class TelegramBuddy(PackageService):
     def max_tokens_for_model(self) -> int:
         if self.config.use_gpt4:
             # Use 7800 instead of 8000 as buffer for different counting
-            return 7800 - self.gpt4.config['max_tokens']
+            return 7800 - self.get_gpt4().config['max_tokens']
         else:
             # Use 4000 instead of 4097 as buffer for different counting
-            return 4097 - self.gpt4.config['max_tokens']
+            return 4097 - self.get_gpt4().config['max_tokens']
 
 
+    def response_for_exception(self, e: Optional[Exception]) -> str:
+        if e is None:
+            return "An unknown error happened. Please reach out to support@steamship.com or on our discord at https://steamship.com/discord"
+
+        if "usage limit" in f"{e}":
+            return "You have reached the introductory limit of Steamship. Visit https://steamship.com/account/plan to sign up for a plan."
+
+        return f"An error happened while creating a response: {e}"
