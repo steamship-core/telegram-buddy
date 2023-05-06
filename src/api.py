@@ -77,26 +77,38 @@ class TelegramBuddy(PackageService):
     
 
     @post("respond", public=True)
-    def respond(self, update_id: int, message: dict) -> InvocableResponse[str]:
+    def respond(self, update_id: int, message: dict, **kwargs) -> InvocableResponse[str]:
         """Endpoint implementing the Telegram WebHook contract. This is a PUBLIC endpoint since Telegram cannot pass a Bearer token."""
-        message_text = message['text']
-        chat_id = message['chat']['id']
-        message_id = message['message_id']
 
-        # TODO: must reject things not from the package
-        try:
+        message_text = (message or {}).get('text', "")
+        if message_text is not None and message_text != "":
+            chat_id = message['chat']['id']
+            message_id = message['message_id']
+
+            # TODO: must reject things not from the package
             try:
-                response = self.prepare_response(message_text, chat_id, message_id)
-            except SteamshipError as e:
-                response = self.response_for_exception(e)
-            if response is not None:
-                self.send_response(chat_id, response)
+                try:
+                    response = self.prepare_response(message_text, chat_id, message_id)
+                except SteamshipError as e:
+                    response = self.response_for_exception(e)
+                if response is not None:
+                    self.send_response(chat_id, response)
 
-            return InvocableResponse(string="OK")
-        except Exception as e:
-            response = self.response_for_exception(e)
-            self.send_response(chat_id, response)
-            return InvocableResponse(string="OK")
+                return InvocableResponse(string="OK")
+            except Exception as e:
+                response = self.response_for_exception(e)
+                self.send_response(chat_id, response)
+                return InvocableResponse(string="OK")
+
+        # IF do nothing, make sure we return ok
+        return InvocableResponse(string="OK")
+
+
+    @post("webhook_info")
+    def webhook_info(self) -> dict:
+        return requests.get(
+            self.api_root + '/getWebhookInfo').json()
+
 
     @post("info")
     def info(self) -> dict:
