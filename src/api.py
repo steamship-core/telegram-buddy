@@ -1,13 +1,15 @@
 """Description of your app."""
-import json
+import logging
 from typing import Type, Optional
 
+from pydantic import Field
 import requests
 from steamship.invocable import Config, post, PackageService, InvocableResponse
 from steamship import SteamshipError, File, Block, Tag
 from steamship.data.tags.tag_constants import TagKind, RoleTag
-import logging
-from pydantic import Field
+from telegram import Update as TelegramUpdate
+from telegram import Bot, Message
+
 
 class TelegramBuddyConfig(Config):
     """Config object containing required parameters to initialize a MyPackage instance."""
@@ -16,6 +18,7 @@ class TelegramBuddyConfig(Config):
     bot_personality: str = Field(description='Complete the sentence, "The bot\'s personality is _." Writing a longer, more detailed description will yield less generic results.')
     bot_token: str = Field(description="The secret token for your Telegram bot")
     use_gpt4: bool = Field(False, description="If True, use GPT-4 instead of GPT-3.5 to generate responses. GPT-4 creates better responses at higher cost and with longer wait times.")
+
 
 class TelegramBuddy(PackageService):
     """Telegram Buddy package.  Stores individual chats in Steamship Files for chat history."""
@@ -44,13 +47,22 @@ class TelegramBuddy(PackageService):
 
 
     @post("respond", public=True)
-    def respond(self, update_id: int, message: dict) -> InvocableResponse[str]:
+    def respond(self, **kwargs) -> InvocableResponse[str]:
         """ This is the responder method for the telegram webhook. It is public since Telegram cannot pass a Bearer token. """
 
+        update = TelegramUpdate(**kwargs)
+
+        message_obj = update.message
+        message = Message.de_json(data=message_obj, bot=Bot(token=self.config.bot_token))
+
+        if not message.text:
+            logging.warning("no message text received")
+            return InvocableResponse(string="OK")
+
         # TODO: must reject things not from the package
-        message_text = message['text']
-        chat_id = message['chat']['id']
-        message_id = message['message_id']
+        message_text = message.text
+        chat_id = message.chat.id
+        message_id = message.message_id
         logging.info(f"{message_text} {chat_id} {type(chat_id)}")
         try:
             response = self.prepare_response(message_text, chat_id, message_id)

@@ -1,1 +1,4 @@
-steamship===2.15.0
+steamship~=2.16.6
+python-telegram-bot
+requests~=2.28.1
+pydantic~=1.10.2
