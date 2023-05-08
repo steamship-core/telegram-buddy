@@ -77,26 +77,42 @@ class TelegramBuddy(PackageService):
     
 
     @post("respond", public=True)
-    def respond(self, update_id: int, message: dict) -> InvocableResponse[str]:
+    def respond(self, update_id: int, **kwargs) -> InvocableResponse[str]:
         """Endpoint implementing the Telegram WebHook contract. This is a PUBLIC endpoint since Telegram cannot pass a Bearer token."""
-        message_text = message['text']
-        chat_id = message['chat']['id']
-        message_id = message['message_id']
+        message = kwargs.get('message', None)
+        message_text = (message or {}).get('text', "")
 
-        # TODO: must reject things not from the package
-        try:
+        if (not message_text) or len(message_text) == 0:
+            # If we do nothing, make sure we return ok
+            return InvocableResponse(string="OK")
+
+        else:
+            chat_id = message['chat']['id']
+            message_id = message['message_id']
+
+            # TODO: must reject things not from the package
             try:
-                response = self.prepare_response(message_text, chat_id, message_id)
-            except SteamshipError as e:
-                response = self.response_for_exception(e)
-            if response is not None:
-                self.send_response(chat_id, response)
+                try:
+                    response = self.prepare_response(message_text, chat_id, message_id)
+                except SteamshipError as e:
+                    response = self.response_for_exception(e)
+                if response is not None:
+                    self.send_response(chat_id, response)
 
-            return InvocableResponse(string="OK")
-        except Exception as e:
-            response = self.response_for_exception(e)
-            self.send_response(chat_id, response)
-            return InvocableResponse(string="OK")
+                return InvocableResponse(string="OK")
+            except Exception as e:
+                response = self.response_for_exception(e)
+                self.send_response(chat_id, response)
+                return InvocableResponse(string="OK")
+
+
+
+
+    @post("webhook_info")
+    def webhook_info(self) -> dict:
+        return requests.get(
+            self.api_root + '/getWebhookInfo').json()
+
 
     @post("info")
     def info(self) -> dict:
