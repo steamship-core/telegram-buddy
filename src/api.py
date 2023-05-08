@@ -41,7 +41,7 @@ class TelegramBuddy(TelegramBot):
         return TelegramBuddyConfig
 
 
-    def respond_to_text(self, message_text: str, chat_id: int, message_id: int) -> Optional[str]:
+    def respond_to_text(self, message_text: str, chat_id: int, message_id: int, update_kwargs: dict) -> Optional[str]:
         """ Use the LLM to prepare the next response by appending the user input to the file and then generating. """
         chat_file = self.get_file_for_chat(chat_id)
 
