@@ -98,10 +98,6 @@ class TelegramBuddy(TelegramBot):
             return 4097 - self.get_gpt4().config['max_tokens']
 
 
-    @post("test_shows")
-    def test_shows(self, p: str) -> str:
-        return "ok"
-
 
 
 
