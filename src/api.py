@@ -77,11 +77,16 @@ class TelegramBuddy(PackageService):
     
 
     @post("respond", public=True)
-    def respond(self, update_id: int, message: dict, **kwargs) -> InvocableResponse[str]:
+    def respond(self, update_id: int, **kwargs) -> InvocableResponse[str]:
         """Endpoint implementing the Telegram WebHook contract. This is a PUBLIC endpoint since Telegram cannot pass a Bearer token."""
-
+        message = kwargs.get('message', None)
         message_text = (message or {}).get('text', "")
-        if message_text is not None and message_text != "":
+
+        if (not message_text) or len(message_text) == 0:
+            # If we do nothing, make sure we return ok
+            return InvocableResponse(string="OK")
+
+        else:
             chat_id = message['chat']['id']
             message_id = message['message_id']
 
@@ -100,8 +105,7 @@ class TelegramBuddy(PackageService):
                 self.send_response(chat_id, response)
                 return InvocableResponse(string="OK")
 
-        # IF do nothing, make sure we return ok
-        return InvocableResponse(string="OK")
+
 
 
     @post("webhook_info")
