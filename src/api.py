@@ -1,16 +1,14 @@
 """Description of your app."""
-import json
 from typing import Type, Optional, Dict, Any
 
 import requests
-from steamship.invocable import Config, post, get, PackageService, InvocableResponse
-from steamship import SteamshipError, File, Block, Tag
-from steamship.data.tags.tag_constants import TagKind, RoleTag
+from steamship.experimental import ChatFile
+from steamship.invocable import Config, post, PackageService, InvocableResponse
+from steamship import SteamshipError, Tag
 import logging
 from pydantic import Field
 import uuid
 
-from util import filter_blocks_for_prompt_length
 
 
 class TelegramBuddyConfig(Config):
@@ -101,22 +99,16 @@ class TelegramBuddy(PackageService):
             return None
 
 
-        chat_file.append_block(text=message_text, tags=[
-            Tag(kind=TagKind.ROLE, name=RoleTag.USER),
+        chat_file.append_user_block(text=message_text, tags=[
             Tag(kind="message_id", name=str(message_id))
         ])
-        chat_file.refresh()
-        # Limit total tokens passed to fit in context window
-        max_tokens = self.max_tokens_for_model()
-        retained_blocks = filter_blocks_for_prompt_length(max_tokens, chat_file.blocks)
-        generate_task = self.gpt4.generate(input_file_id=chat_file.id, input_file_block_index_list = retained_blocks,
-                                           append_output_to_file=True, output_file_id=chat_file.id)
 
+        generate_task = chat_file.generate_next_response()
         # TODO: handle moderated input error
         generate_task.wait()
         return generate_task.output.blocks[0].text
 
-    def includes_message(self, file: File, message_id: int):
+    def includes_message(self, file: ChatFile, message_id: int):
         """Determine if the message ID has already been processed in this file by checking Block tags."""
         for block in file.blocks:
             for tag in block.tags:
@@ -124,21 +116,23 @@ class TelegramBuddy(PackageService):
                     return True
         return False
 
-    def get_file_for_chat(self, chat_id: int) -> File:
+    def get_file_for_chat(self, chat_id: int) -> ChatFile:
         """ Find the File associated with this chat id, or create it """
         file_handle = str(chat_id)
         try:
-            file = File.get(self.client, handle=file_handle)
+            chatfile = ChatFile.get(self.client, handle=file_handle)
         except:
-            file = self.create_new_file_for_chat(file_handle)
-        return file
+            chatfile = self.create_new_file_for_chat(file_handle)
+        return chatfile
 
-    def create_new_file_for_chat(self, file_handle: str):
+    def create_new_file_for_chat(self, file_handle: str) -> ChatFile:
         """ Create a new File for this chat id, beginning with the system prompt based on name and personality."""
-        return File.create(self.client, handle=file_handle, blocks=[
-            Block(text=f"Your name is {self.config.bot_name}. Your personality is {self.config.bot_personality}.",
-                  tags=[Tag(kind=TagKind.ROLE, name=RoleTag.SYSTEM)])
-        ])
+        max_tokens = self.max_tokens_for_model()
+        return ChatFile.create(self.client, handle=file_handle,
+           generator_instance_handle=self.gpt4.handle,
+           max_generation_tokens=max_tokens,
+           initial_system_prompt = f"Your name is {self.config.bot_name}. Your personality is {self.config.bot_personality}.",
+        )
 
 
     def send_response(self, chat_id: int, text: str):
