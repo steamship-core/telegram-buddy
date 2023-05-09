@@ -1,7 +1,8 @@
 """Description of your app."""
-from typing import Type, Optional, Dict, Any, cast
+from typing import Type, Optional, Dict, Any, cast, List
 
 from steamship.experimental.package_starters.telegram_bot import TelegramBotConfig, TelegramBot
+from steamship.experimental.transports.chat import ChatMessage
 from steamship.invocable import Config, post, get, PackageService, InvocableResponse
 from steamship import SteamshipError, File, Block, Tag, PluginInstance
 from steamship.data.tags.tag_constants import TagKind, RoleTag
@@ -40,18 +41,19 @@ class TelegramBuddy(TelegramBot):
         """Return the Configuration class."""
         return TelegramBuddyConfig
 
-
-    def respond_to_text(self, message_text: str, chat_id: int, message_id: int, update_kwargs: dict) -> Optional[str]:
+    def create_response(self, incoming_message: ChatMessage) -> Optional[List[ChatMessage]]:
         """ Use the LLM to prepare the next response by appending the user input to the file and then generating. """
-        chat_file = self.get_file_for_chat(chat_id)
+        chat_file = self.get_file_for_chat(incoming_message.get_chat_id())
 
-        if self.includes_message(chat_file, message_id):
+        if self.includes_message(chat_file, incoming_message.get_message_id()):
             return None
 
+        if incoming_message.text is None or incoming_message.text == "":
+            return None
 
-        chat_file.append_block(text=message_text, tags=[
+        chat_file.append_block(text=incoming_message.text, tags=[
             Tag(kind=TagKind.ROLE, name=RoleTag.USER),
-            Tag(kind="message_id", name=str(message_id))
+            Tag(kind="message_id", name=incoming_message.get_message_id())
         ])
         chat_file.refresh()
         # Limit total tokens passed to fit in context window
@@ -62,19 +64,19 @@ class TelegramBuddy(TelegramBot):
 
         # TODO: handle moderated input error
         generate_task.wait()
-        return generate_task.output.blocks[0].text
+        return [ChatMessage.from_block(block, chat_id=incoming_message.get_chat_id()) for block in generate_task.output.blocks]
 
-    def includes_message(self, file: File, message_id: int):
+    def includes_message(self, file: File, message_id: str):
         """Determine if the message ID has already been processed in this file by checking Block tags."""
         for block in file.blocks:
             for tag in block.tags:
-                if tag.kind == "message_id" and tag.name == str(message_id):
+                if tag.kind == "message_id" and tag.name == message_id:
                     return True
         return False
 
-    def get_file_for_chat(self, chat_id: int) -> File:
+    def get_file_for_chat(self, chat_id: str) -> File:
         """ Find the File associated with this chat id, or create it """
-        file_handle = str(chat_id)
+        file_handle = chat_id
         try:
             file = File.get(self.client, handle=file_handle)
         except:
